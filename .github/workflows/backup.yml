@@ -1,1 +1,48 @@
-# test
+name: Backup PostgreSQL to Google DriveMore actions
+
+on:
+  push:
+    branches:
+      - main  
+  workflow_dispatch:
+
+
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+
+      - name: Instalar dependências
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client zip
+
+
+      - name: Fazer backup com pg_dump (linha única)
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_NAME="backup_$TIMESTAMP.sql"
+          ZIP_NAME="backup_$TIMESTAMP.zip"
+
+          pg_dump -h ${{ secrets.PGHOST }} \
+                  -p ${{ secrets.PGPORT }} \
+                  -U ${{ secrets.PGUSER }} \
+                  -d ${{ secrets.PGDATABASE }} \
+                  --no-password \
+                  -f $BACKUP_NAME
+
+          zip $ZIP_NAME $BACKUP_NAME
+
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+      - name: Upload para o Google Drive
+        uses: adityak74/google-drive-upload-git-action@main
+        with:
+          credentials: ${{ secrets.CREDENTIALS }}
+          filename: ${{ env.ZIP_NAME }}
+          folderId: ${{ secrets.FOLDER_ID }}
